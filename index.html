@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONE桌遊 AI 選址系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 15px;
+            border-radius: 50%;
+            overflow: hidden;
+        }
+        
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        h1 {
+            color: white;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        
+        .subtitle {
+            color: rgba(255,255,255,0.9);
+            font-size: 16px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        
+        .input-group input:focus,
+        .input-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            display: none;
+        }
+        
+        .result.show {
+            display: block;
+        }
+        
+        .score-card {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
+            border-radius: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .score-value {
+            font-size: 72px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        .score-label {
+            color: #666;
+            font-size: 18px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        .status-excellent {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-good {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-poor {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .detail-section {
+            margin-bottom: 25px;
+        }
+        
+        .detail-section h3 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .detail-item {
+            padding: 15px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .detail-label {
+            color: #666;
+            font-size: 15px;
+        }
+        
+        .detail-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .detail-value.pass {
+            color: #28a745;
+        }
+        
+        .detail-value.fail {
+            color: #dc3545;
+        }
+        
+        .detail-value.warning {
+            color: #ffc107;
+        }
+        
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .api-notice {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .api-notice h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .api-notice p {
+            color: #856404;
+            line-height: 1.6;
+        }
+        
+        .api-notice code {
+            background: rgba(0,0,0,0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <img src="https://ken0900101318-beep.github.io/one-management-portal/one-logo.jpg" alt="ONE桌遊">
+            </div>
+            <h1>🎮 ONE桌遊 AI 選址系統</h1>
+            <p class="subtitle">快速評估麻將館開店地點是否符合法規</p>
+        </div>
+        
+        <div class="card">
+            <div class="api-notice">
+                <h3>⚠️ 設定提醒</h3>
+                <p>
+                    本系統需要 Google Maps API Key 才能運作。<br>
+                    請在第 <code>316</code> 行將 <code>YOUR_API_KEY_HERE</code> 替換為您的 API Key。
+                </p>
+            </div>
+            
+            <div class="input-group">
+                <label>📍 地址</label>
+                <input type="text" id="addressInput" placeholder="例: 台中市西屯區台灣大道三段99號">
+            </div>
+            
+            <div class="input-group">
+                <label>🏙️ 縣市</label>
+                <select id="citySelect">
+                    <option value="">請選擇</option>
+                    <option value="台北市">台北市</option>
+                    <option value="新北市">新北市</option>
+                    <option value="桃園市">桃園市</option>
+                    <option value="台中市">台中市</option>
+                    <option value="台南市">台南市</option>
+                    <option value="高雄市">高雄市</option>
+                </select>
+            </div>
+            
+            <button class="btn btn-primary" id="analyzeBtn">🔍 開始分析</button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <p>🔄 分析中，請稍候...</p>
+        </div>
+        
+        <div class="result" id="result">
+            <div class="card">
+                <div class="score-card">
+                    <div class="score-value" id="scoreValue">--</div>
+                    <div class="score-label">綜合評分</div>
+                    <span class="status-badge" id="statusBadge">--</span>
+                </div>
+                
+                <div id="map"></div>
+                
+                <div class="detail-section">
+                    <h3>📊 評分明細</h3>
+                    <div class="detail-item">
+                        <span class="detail-label">200m 內無學校</span>
+                        <span class="detail-value" id="schoolScore">--</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">人流量評估</span>
+                        <span class="detail-value" id="trafficScore">--</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">交通便利度</span>
+                        <span class="detail-value" id="transportScore">--</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">建物年份</span>
+                        <span class="detail-value" id="buildingScore">--</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">競爭狀況</span>
+                        <span class="detail-value" id="competitionScore">--</span>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h3>🏢 地點詳細資訊</h3>
+                    <div id="detailInfo"></div>
+                </div>
+                
+                <div class="detail-section">
+                    <h3>💡 建議</h3>
+                    <div id="recommendation"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'YOUR_API_KEY_HERE'; // ⚠️ 請替換為您的 Google Maps API Key
+        
+        let map;
+        let marker;
+        let service;
+        
+        // 初始化地圖
+        function initMap(lat, lng) {
+            const location = { lat, lng };
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 16,
+                center: location
+            });
+            
+            marker = new google.maps.Marker({
+                position: location,
+                map: map,
+                title: '選址地點'
+            });
+            
+            service = new google.maps.places.PlacesService(map);
+        }
+        
+        // 搜尋附近學校
+        async function searchSchools(lat, lng) {
+            return new Promise((resolve) => {
+                const request = {
+                    location: new google.maps.LatLng(lat, lng),
+                    radius: 200,
+                    type: ['school']
+                };
+                
+                service.nearbySearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        const schools = results.filter(place => {
+                            const name = place.name.toLowerCase();
+                            return name.includes('國小') || name.includes('國中') || 
+                                   name.includes('高中') || name.includes('elementary') || 
+                                   name.includes('junior') || name.includes('senior');
+                        });
+                        resolve(schools);
+                    } else {
+                        resolve([]);
+                    }
+                });
+            });
+        }
+        
+        // 搜尋附近餐廳（人流評估）
+        async function searchRestaurants(lat, lng) {
+            return new Promise((resolve) => {
+                const request = {
+                    location: new google.maps.LatLng(lat, lng),
+                    radius: 300,
+                    type: ['restaurant', 'cafe']
+                };
+                
+                service.nearbySearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        resolve(results.length);
+                    } else {
+                        resolve(0);
+                    }
+                });
+            });
+        }
+        
+        // 搜尋交通站點
+        async function searchTransport(lat, lng) {
+            return new Promise((resolve) => {
+                const request = {
+                    location: new google.maps.LatLng(lat, lng),
+                    radius: 500,
+                    type: ['bus_station', 'subway_station', 'transit_station']
+                };
+                
+                service.nearbySearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        resolve(results.length);
+                    } else {
+                        resolve(0);
+                    }
+                });
+            });
+        }
+        
+        // 計算評分
+        function calculateScore(data) {
+            let score = 0;
+            const details = {};
+            
+            // 1. 200m 內無學校 (40分)
+            if (data.schools.length === 0) {
+                score += 40;
+                details.school = { score: 40, status: 'pass', text: '✅ 無學校 (40分)' };
+            } else {
+                details.school = { score: 0, status: 'fail', text: `❌ 發現 ${data.schools.length} 間學校 (0分)` };
+            }
+            
+            // 2. 人流量 (20分)
+            const trafficScore = Math.min(20, Math.floor(data.restaurants / 5) * 4);
+            score += trafficScore;
+            details.traffic = { 
+                score: trafficScore, 
+                status: trafficScore >= 12 ? 'pass' : (trafficScore >= 6 ? 'warning' : 'fail'),
+                text: `${data.restaurants} 間餐廳/商店 (${trafficScore}分)`
+            };
+            
+            // 3. 交通便利度 (15分)
+            const transportScore = Math.min(15, data.transport * 5);
+            score += transportScore;
+            details.transport = { 
+                score: transportScore, 
+                status: transportScore >= 10 ? 'pass' : (transportScore >= 5 ? 'warning' : 'fail'),
+                text: `${data.transport} 個交通站點 (${transportScore}分)`
+            };
+            
+            // 4. 建物年份 (10分) - 暫時給 5分（無實價登錄API時）
+            score += 5;
+            details.building = { score: 5, status: 'warning', text: '需人工確認 (5分)' };
+            
+            // 5. 競爭狀況 (15分) - 暫時給 10分（無桌遊店資料時）
+            score += 10;
+            details.competition = { score: 10, status: 'warning', text: '需人工確認 (10分)' };
+            
+            return { score, details };
+        }
+        
+        // 主要分析函式
+        async function analyzeLocation() {
+            const address = document.getElementById('addressInput').value.trim();
+            const city = document.getElementById('citySelect').value;
+            
+            if (!address || !city) {
+                alert('請輸入地址並選擇縣市');
+                return;
+            }
+            
+            if (API_KEY === 'YOUR_API_KEY_HERE') {
+                alert('⚠️ 請先設定 Google Maps API Key！\n\n請編輯 HTML 第 316 行，將 YOUR_API_KEY_HERE 替換為您的 API Key。');
+                return;
+            }
+            
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('result').classList.remove('show');
+            
+            try {
+                // 地址轉座標
+                const geocoder = new google.maps.Geocoder();
+                const geocodeResult = await new Promise((resolve, reject) => {
+                    geocoder.geocode({ address: address }, (results, status) => {
+                        if (status === 'OK') {
+                            resolve(results[0]);
+                        } else {
+                            reject('地址查詢失敗');
+                        }
+                    });
+                });
+                
+                const lat = geocodeResult.geometry.location.lat();
+                const lng = geocodeResult.geometry.location.lng();
+                
+                // 初始化地圖
+                initMap(lat, lng);
+                
+                // 搜尋資料
+                const schools = await searchSchools(lat, lng);
+                const restaurants = await searchRestaurants(lat, lng);
+                const transport = await searchTransport(lat, lng);
+                
+                // 計算評分
+                const result = calculateScore({
+                    schools,
+                    restaurants,
+                    transport
+                });
+                
+                // 顯示結果
+                displayResult(result, { address, city, lat, lng, schools });
+                
+            } catch (error) {
+                alert('分析失敗：' + error);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+            }
+        }
+        
+        // 顯示結果
+        function displayResult(result, data) {
+            document.getElementById('result').classList.add('show');
+            
+            // 評分
+            document.getElementById('scoreValue').textContent = result.score;
+            
+            // 狀態標籤
+            const badge = document.getElementById('statusBadge');
+            if (result.score >= 80) {
+                badge.textContent = '✅ 優秀';
+                badge.className = 'status-badge status-excellent';
+            } else if (result.score >= 60) {
+                badge.textContent = '⚠️ 良好';
+                badge.className = 'status-badge status-good';
+            } else {
+                badge.textContent = '❌ 不推薦';
+                badge.className = 'status-badge status-poor';
+            }
+            
+            // 評分明細
+            document.getElementById('schoolScore').innerHTML = result.details.school.text;
+            document.getElementById('schoolScore').className = `detail-value ${result.details.school.status}`;
+            
+            document.getElementById('trafficScore').innerHTML = result.details.traffic.text;
+            document.getElementById('trafficScore').className = `detail-value ${result.details.traffic.status}`;
+            
+            document.getElementById('transportScore').innerHTML = result.details.transport.text;
+            document.getElementById('transportScore').className = `detail-value ${result.details.transport.status}`;
+            
+            document.getElementById('buildingScore').innerHTML = result.details.building.text;
+            document.getElementById('buildingScore').className = `detail-value ${result.details.building.status}`;
+            
+            document.getElementById('competitionScore').innerHTML = result.details.competition.text;
+            document.getElementById('competitionScore').className = `detail-value ${result.details.competition.status}`;
+            
+            // 詳細資訊
+            let detailHTML = `
+                <div class="detail-item">
+                    <span class="detail-label">地址</span>
+                    <span class="detail-value">${data.address}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">縣市</span>
+                    <span class="detail-value">${data.city}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">座標</span>
+                    <span class="detail-value">${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}</span>
+                </div>
+            `;
+            
+            if (data.schools.length > 0) {
+                detailHTML += `
+                    <div class="detail-item">
+                        <span class="detail-label">⚠️ 附近學校</span>
+                        <span class="detail-value fail">${data.schools.map(s => s.name).join(', ')}</span>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('detailInfo').innerHTML = detailHTML;
+            
+            // 建議
+            let recommendation = '';
+            if (result.score >= 80) {
+                recommendation = '<p style="color: #28a745; font-size: 16px; line-height: 1.8;">✅ <strong>推薦此地點！</strong> 各項條件良好，建議進一步實地考察。</p>';
+            } else if (result.score >= 60) {
+                recommendation = '<p style="color: #ffc107; font-size: 16px; line-height: 1.8;">⚠️ <strong>尚可考慮。</strong> 部分條件需要補強，建議評估使用分區與租金是否合理。</p>';
+            } else {
+                recommendation = '<p style="color: #dc3545; font-size: 16px; line-height: 1.8;">❌ <strong>不推薦。</strong> 條件不符合，建議尋找其他地點。</p>';
+            }
+            
+            if (data.city === '台中市') {
+                recommendation += '<p style="color: #666; margin-top: 10px;">📌 台中市限定：需確認為<strong>商業區</strong>才可開設麻將館。</p>';
+            } else {
+                recommendation += '<p style="color: #666; margin-top: 10px;">📌 新北/台北/桃園：<strong>住宅區或商業區</strong>皆可開設麻將館。</p>';
+            }
+            
+            document.getElementById('recommendation').innerHTML = recommendation;
+            
+            // 捲動到結果
+            document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // 綁定按鈕
+        document.getElementById('analyzeBtn').addEventListener('click', analyzeLocation);
+        
+        // Enter 鍵觸發
+        document.getElementById('addressInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') analyzeLocation();
+        });
+    </script>
+    
+    <!-- Google Maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY_HERE&libraries=places&language=zh-TW" async defer></script>
+</body>
+</html>
