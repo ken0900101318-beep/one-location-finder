@@ -233,13 +233,38 @@
         .loading.show {
             display: block;
         }
+        
+        .api-notice {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .api-notice h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .api-notice p {
+            color: #856404;
+            line-height: 1.6;
+        }
+        
+        .api-notice code {
+            background: rgba(0,0,0,0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <div class="logo">
-                <img src="https://ken0900101318-beep.github.io/one-management-portal/one-logo.jpg" alt="ONE桌遊" onerror="this.style.display='none'">
+                <img src="https://ken0900101318-beep.github.io/one-management-portal/one-logo.jpg" alt="ONE桌遊">
             </div>
             <h1>🎮 ONE桌遊 AI 選址系統</h1>
             <p class="subtitle">快速評估麻將館開店地點是否符合法規</p>
@@ -323,70 +348,85 @@
         
         let map;
         let marker;
-        
-        // 使用 Fetch API 直接調用 Google Maps API
-        async function geocodeAddress(address) {
-            const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${API_KEY}&language=zh-TW`;
-            const response = await fetch(url);
-            const data = await response.json();
-            
-            if (data.status === 'OK') {
-                return data.results[0];
-            } else {
-                throw new Error('地址查詢失敗：' + data.status);
-            }
-        }
-        
-        // 搜尋附近學校
-        async function searchNearbyPlaces(lat, lng, type, radius = 200) {
-            const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&key=${API_KEY}&language=zh-TW`;
-            
-            // 使用 CORS proxy（暫時方案）
-            const proxyUrl = 'https://api.allorigins.win/raw?url=';
-            
-            try {
-                const response = await fetch(proxyUrl + encodeURIComponent(url));
-                const data = await response.json();
-                
-                if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
-                    return data.results || [];
-                } else {
-                    console.error('API Error:', data.status, data.error_message);
-                    return [];
-                }
-            } catch (error) {
-                console.error('Search error:', error);
-                return [];
-            }
-        }
+        let service;
         
         // 初始化地圖
         function initMap(lat, lng) {
             const location = { lat, lng };
             map = new google.maps.Map(document.getElementById('map'), {
                 zoom: 16,
-                center: location,
-                mapTypeControl: true,
-                streetViewControl: true
+                center: location
             });
             
             marker = new google.maps.Marker({
                 position: location,
                 map: map,
-                title: '選址地點',
-                animation: google.maps.Animation.DROP
+                title: '選址地點'
             });
             
-            // 加上 200m 圓圈
-            new google.maps.Circle({
-                strokeColor: '#FF0000',
-                strokeOpacity: 0.8,
-                strokeWeight: 2,
-                fillColor: '#FF0000',
-                fillOpacity: 0.15,
-                map: map,
-                center: location,
-                radius: 200
+            service = new google.maps.places.PlacesService(map);
+        }
+        
+        // 搜尋附近學校
+        async function searchSchools(lat, lng) {
+            return new Promise((resolve) => {
+                const request = {
+                    location: new google.maps.LatLng(lat, lng),
+                    radius: 200,
+                    type: ['school']
+                };
+                
+                service.nearbySearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        const schools = results.filter(place => {
+                            const name = place.name.toLowerCase();
+                            return name.includes('國小') || name.includes('國中') || 
+                                   name.includes('高中') || name.includes('elementary') || 
+                                   name.includes('junior') || name.includes('senior');
+                        });
+                        resolve(schools);
+                    } else {
+                        resolve([]);
+                    }
+                });
+            });
+        }
+        
+        // 搜尋附近餐廳（人流評估）
+        async function searchRestaurants(lat, lng) {
+            return new Promise((resolve) => {
+                const request = {
+                    location: new google.maps.LatLng(lat, lng),
+                    radius: 300,
+                    type: ['restaurant', 'cafe']
+                };
+                
+                service.nearbySearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        resolve(results.length);
+                    } else {
+                        resolve(0);
+                    }
+                });
+            });
+        }
+        
+        // 搜尋交通站點
+        async function searchTransport(lat, lng) {
+            return new Promise((resolve) => {
+                const request = {
+                    location: new google.maps.LatLng(lat, lng),
+                    radius: 500,
+                    type: ['bus_station', 'subway_station', 'transit_station']
+                };
+                
+                service.nearbySearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        resolve(results.length);
+                    } else {
+                        resolve(0);
+                    }
+                });
             });
         }
         
@@ -396,47 +436,40 @@
             const details = {};
             
             // 1. 200m 內無學校 (40分)
-            const schoolsInRange = data.schools.filter(s => {
-                const name = (s.name || '').toLowerCase();
-                return name.includes('國小') || name.includes('國中') || 
-                       name.includes('高中') || name.includes('elementary') || 
-                       name.includes('junior') || name.includes('senior');
-            });
-            
-            if (schoolsInRange.length === 0) {
+            if (data.schools.length === 0) {
                 score += 40;
                 details.school = { score: 40, status: 'pass', text: '✅ 無學校 (40分)' };
             } else {
-                details.school = { score: 0, status: 'fail', text: `❌ 發現 ${schoolsInRange.length} 間學校 (0分)` };
+                details.school = { score: 0, status: 'fail', text: `❌ 發現 ${data.schools.length} 間學校 (0分)` };
             }
             
             // 2. 人流量 (20分)
-            const trafficScore = Math.min(20, Math.floor(data.restaurants.length / 5) * 4);
+            const trafficScore = Math.min(20, Math.floor(data.restaurants / 5) * 4);
             score += trafficScore;
             details.traffic = { 
                 score: trafficScore, 
                 status: trafficScore >= 12 ? 'pass' : (trafficScore >= 6 ? 'warning' : 'fail'),
-                text: `${data.restaurants.length} 間餐廳/商店 (${trafficScore}分)`
+                text: `${data.restaurants} 間餐廳/商店 (${trafficScore}分)`
             };
             
             // 3. 交通便利度 (15分)
-            const transportScore = Math.min(15, data.transport.length * 5);
+            const transportScore = Math.min(15, data.transport * 5);
             score += transportScore;
             details.transport = { 
                 score: transportScore, 
                 status: transportScore >= 10 ? 'pass' : (transportScore >= 5 ? 'warning' : 'fail'),
-                text: `${data.transport.length} 個交通站點 (${transportScore}分)`
+                text: `${data.transport} 個交通站點 (${transportScore}分)`
             };
             
-            // 4. 建物年份 (10分) - 暫時給 5分
+            // 4. 建物年份 (10分) - 暫時給 5分（無實價登錄API時）
             score += 5;
             details.building = { score: 5, status: 'warning', text: '需人工確認 (5分)' };
             
-            // 5. 競爭狀況 (15分) - 暫時給 10分
+            // 5. 競爭狀況 (15分) - 暫時給 10分（無桌遊店資料時）
             score += 10;
             details.competition = { score: 10, status: 'warning', text: '需人工確認 (10分)' };
             
-            return { score, details, schoolsInRange };
+            return { score, details };
         }
         
         // 主要分析函式
@@ -449,38 +482,50 @@
                 return;
             }
             
+            if (API_KEY === 'YOUR_API_KEY_HERE') {
+                alert('⚠️ 請先設定 Google Maps API Key！\n\n請編輯 HTML 第 316 行，將 YOUR_API_KEY_HERE 替換為您的 API Key。');
+                return;
+            }
+            
             document.getElementById('loading').classList.add('show');
             document.getElementById('result').classList.remove('show');
             
             try {
-                // 1. 地址轉座標
-                const geocodeResult = await geocodeAddress(address);
-                const lat = geocodeResult.geometry.location.lat;
-                const lng = geocodeResult.geometry.location.lng;
+                // 地址轉座標
+                const geocoder = new google.maps.Geocoder();
+                const geocodeResult = await new Promise((resolve, reject) => {
+                    geocoder.geocode({ address: address }, (results, status) => {
+                        if (status === 'OK') {
+                            resolve(results[0]);
+                        } else {
+                            reject('地址查詢失敗');
+                        }
+                    });
+                });
                 
-                // 2. 初始化地圖
+                const lat = geocodeResult.geometry.location.lat();
+                const lng = geocodeResult.geometry.location.lng();
+                
+                // 初始化地圖
                 initMap(lat, lng);
                 
-                // 3. 搜尋資料
-                const [schools, restaurants, transport] = await Promise.all([
-                    searchNearbyPlaces(lat, lng, 'school', 200),
-                    searchNearbyPlaces(lat, lng, 'restaurant', 300),
-                    searchNearbyPlaces(lat, lng, 'transit_station', 500)
-                ]);
+                // 搜尋資料
+                const schools = await searchSchools(lat, lng);
+                const restaurants = await searchRestaurants(lat, lng);
+                const transport = await searchTransport(lat, lng);
                 
-                // 4. 計算評分
+                // 計算評分
                 const result = calculateScore({
                     schools,
                     restaurants,
                     transport
                 });
                 
-                // 5. 顯示結果
-                displayResult(result, { address, city, lat, lng });
+                // 顯示結果
+                displayResult(result, { address, city, lat, lng, schools });
                 
             } catch (error) {
-                console.error('Error:', error);
-                alert('分析失敗：' + error.message + '\n\n請確認地址是否正確，或稍後再試。');
+                alert('分析失敗：' + error);
             } finally {
                 document.getElementById('loading').classList.remove('show');
             }
@@ -538,11 +583,11 @@
                 </div>
             `;
             
-            if (result.schoolsInRange && result.schoolsInRange.length > 0) {
+            if (data.schools.length > 0) {
                 detailHTML += `
                     <div class="detail-item">
                         <span class="detail-label">⚠️ 附近學校</span>
-                        <span class="detail-value fail">${result.schoolsInRange.map(s => s.name).join(', ')}</span>
+                        <span class="detail-value fail">${data.schools.map(s => s.name).join(', ')}</span>
                     </div>
                 `;
             }
