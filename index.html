@@ -479,10 +479,10 @@
                 text: `${data.transport.length} 個交通站點 (${transportScore}分)`
             };
             
-            // 4. 建物年份 (10分) - 實價登錄待整合
+            // 4. 建物年份 (10分)
             // 民國64年（1975年）以後通常有使用執照
             const buildingYear = data.building_year || null;
-            let buildingScore = 5; // 預設 5 分
+            let buildingScore = 5; // 預設 5 分（查無資料）
             let buildingText = '建物年份待查詢 (5分)';
             let buildingStatus = 'warning';
             
@@ -490,22 +490,15 @@
                 const age = 115 - buildingYear; // 2026 - 1911 = 115
                 
                 if (buildingYear < 64) {
-                    // 民國64年以前
-                    buildingScore = 3;
+                    // 民國64年以前：0分（需確認使用執照）
+                    buildingScore = 0;
                     buildingStatus = 'fail';
-                    buildingText = `民國${buildingYear}年建（${age}年屋齡）⚠️ 需確認使用執照 (3分)`;
-                } else if (age <= 5) {
+                    buildingText = `民國${buildingYear}年建（${age}年屋齡）❌ 需確認使用執照 (0分)`;
+                } else {
+                    // 民國64年以後：10分（有使用執照）
                     buildingScore = 10;
                     buildingStatus = 'pass';
-                    buildingText = `民國${buildingYear}年建（${age}年屋齡）✅ 新建物 (10分)`;
-                } else if (age <= 15) {
-                    buildingScore = 7;
-                    buildingStatus = 'warning';
-                    buildingText = `民國${buildingYear}年建（${age}年屋齡）⚠️ 中古屋 (7分)`;
-                } else {
-                    buildingScore = 5;
-                    buildingStatus = 'warning';
-                    buildingText = `民國${buildingYear}年建（${age}年屋齡）⚠️ 老屋 (5分)`;
+                    buildingText = `民國${buildingYear}年建（${age}年屋齡）✅ 有使用執照 (10分)`;
                 }
             }
             
