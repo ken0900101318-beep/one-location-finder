@@ -320,13 +320,49 @@
 
     <script>
         const API_KEY = 'AIzaSyA8BU6HhUvgnnmJpP5CgyrUDAnmBvg1GIY';
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyQczCc_nrwSzZx1yHCoEizMDH_p-WinZAANce_6GiK0CGVjdavb2-9VA5c2ooWg1VE/exec';
+        
+        // 使用分區查詢連結
+        const ZONING_LINKS = {
+            "台北市": {
+                "name": "台北市都市計畫使用分區查詢",
+                "url": "https://www.zone.gov.taipei/",
+                "guide": "輸入地址後，查看「使用分區」欄位"
+            },
+            "新北市": {
+                "name": "新北市都市計畫整合資訊系統",
+                "url": "https://udpweb.planning.ntpc.gov.tw/",
+                "guide": "點選「使用分區查詢」→ 輸入地址"
+            },
+            "桃園市": {
+                "name": "桃園市都市計畫整合資訊系統",
+                "url": "https://gis.tycg.gov.tw/TycgOGCMap_Web/",
+                "guide": "點選「都市計畫使用分區查詢」"
+            },
+            "台中市": {
+                "name": "台中市都市計畫整合資訊系統",
+                "url": "https://www.ud.taichung.gov.tw/",
+                "guide": "點選「都市計畫書圖查詢」→ 輸入地址",
+                "note": "⚠️ 台中市麻將館限定商業區"
+            },
+            "台南市": {
+                "name": "台南市都市發展局",
+                "url": "https://www.tainan.gov.tw/",
+                "guide": "需至都發局查詢"
+            },
+            "高雄市": {
+                "name": "高雄市都市計畫整合資訊系統",
+                "url": "https://urban-web.kcg.gov.tw/KDA_gis/",
+                "guide": "點選「使用分區查詢」"
+            }
+        };
         
         let map;
         let marker;
         
-        // 使用 Fetch API 直接調用 Google Maps API
+        // 使用 GAS 後端調用 API（解決 CORS）
         async function geocodeAddress(address) {
-            const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${API_KEY}&language=zh-TW`;
+            const url = `${GAS_URL}?action=geocode&address=${encodeURIComponent(address)}`;
             const response = await fetch(url);
             const data = await response.json();
             
@@ -337,21 +373,38 @@
             }
         }
         
-        // 搜尋附近學校
+        // 搜尋附近地點（透過 GAS）
         async function searchNearbyPlaces(lat, lng, type, radius = 200) {
-            const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&key=${API_KEY}&language=zh-TW`;
-            
-            // 使用 CORS proxy（暫時方案）
-            const proxyUrl = 'https://api.allorigins.win/raw?url=';
+            const url = `${GAS_URL}?action=nearby&lat=${lat}&lng=${lng}&type=${type}&radius=${radius}`;
             
             try {
-                const response = await fetch(proxyUrl + encodeURIComponent(url));
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
                     return data.results || [];
                 } else {
-                    console.error('API Error:', data.status, data.error_message);
+                    console.error('API Error:', data.status);
+                    return [];
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                return [];
+            }
+        }
+        
+        // 搜尋競爭店家
+        async function searchCompetitors(lat, lng) {
+            const url = `${GAS_URL}?action=competitors&lat=${lat}&lng=${lng}`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.status === 'OK') {
+                    return data.results || [];
+                } else {
+                    console.error('Competitors search error:', data.status);
                     return [];
                 }
             } catch (error) {
@@ -428,15 +481,33 @@
                 text: `${data.transport.length} 個交通站點 (${transportScore}分)`
             };
             
-            // 4. 建物年份 (10分) - 暫時給 5分
-            score += 5;
-            details.building = { score: 5, status: 'warning', text: '需人工確認 (5分)' };
+            // 4. 建物年份 (10分) - 實價登錄待整合
+            const buildingScore = 5; // 預設 5 分
+            score += buildingScore;
+            details.building = { 
+                score: buildingScore, 
+                status: 'warning', 
+                text: '實價登錄待整合 (5分)'
+            };
             
-            // 5. 競爭狀況 (15分) - 暫時給 10分
-            score += 10;
-            details.competition = { score: 10, status: 'warning', text: '需人工確認 (10分)' };
+            // 5. 競爭狀況 (15分) - 根據實際搜尋結果
+            const competitors = data.competitors || [];
+            let competitionScore = 15;
             
-            return { score, details, schoolsInRange };
+            if (competitors.length === 0) {
+                competitionScore = 15;
+                details.competition = { score: 15, status: 'pass', text: '✅ 無競爭店家 (15分)' };
+            } else if (competitors.length <= 2) {
+                competitionScore = 10;
+                details.competition = { score: 10, status: 'warning', text: `⚠️ ${competitors.length} 間競爭店家 (10分)` };
+            } else {
+                competitionScore = 5;
+                details.competition = { score: 5, status: 'fail', text: `❌ ${competitors.length} 間競爭店家 (5分)` };
+            }
+            
+            score += competitionScore;
+            
+            return { score, details, schoolsInRange, competitors };
         }
         
         // 主要分析函式
@@ -462,17 +533,19 @@
                 initMap(lat, lng);
                 
                 // 3. 搜尋資料
-                const [schools, restaurants, transport] = await Promise.all([
+                const [schools, restaurants, transport, competitors] = await Promise.all([
                     searchNearbyPlaces(lat, lng, 'school', 200),
                     searchNearbyPlaces(lat, lng, 'restaurant', 300),
-                    searchNearbyPlaces(lat, lng, 'transit_station', 500)
+                    searchNearbyPlaces(lat, lng, 'transit_station', 500),
+                    searchCompetitors(lat, lng)
                 ]);
                 
                 // 4. 計算評分
                 const result = calculateScore({
                     schools,
                     restaurants,
-                    transport
+                    transport,
+                    competitors
                 });
                 
                 // 5. 顯示結果
@@ -543,6 +616,36 @@
                     <div class="detail-item">
                         <span class="detail-label">⚠️ 附近學校</span>
                         <span class="detail-value fail">${result.schoolsInRange.map(s => s.name).join(', ')}</span>
+                    </div>
+                `;
+            }
+            
+            if (result.competitors && result.competitors.length > 0) {
+                detailHTML += `
+                    <div class="detail-item">
+                        <span class="detail-label">⚠️ 競爭店家</span>
+                        <span class="detail-value warning">${result.competitors.map(c => c.name).join(', ')}</span>
+                    </div>
+                `;
+            }
+            
+            // 使用分區查詢連結
+            const zoningInfo = ZONING_LINKS[data.city];
+            if (zoningInfo) {
+                detailHTML += `
+                    <div class="detail-item" style="background: #fff8dc; border: 2px solid #ffa500;">
+                        <div style="width: 100%;">
+                            <div style="margin-bottom: 8px;">
+                                <span class="detail-label">🏛️ 使用分區查詢</span>
+                            </div>
+                            <a href="${zoningInfo.url}" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 600;">
+                                ${zoningInfo.name} →
+                            </a>
+                            <div style="color: #666; font-size: 13px; margin-top: 5px;">
+                                ${zoningInfo.guide}
+                            </div>
+                            ${zoningInfo.note ? `<div style="color: #d32f2f; font-weight: 600; margin-top: 5px;">${zoningInfo.note}</div>` : ''}
+                        </div>
                     </div>
                 `;
             }
