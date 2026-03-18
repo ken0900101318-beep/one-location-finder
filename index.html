@@ -255,12 +255,32 @@
                 <label>🏙️ 縣市</label>
                 <select id="citySelect">
                     <option value="">請選擇</option>
-                    <option value="台北市">台北市</option>
-                    <option value="新北市">新北市</option>
-                    <option value="桃園市">桃園市</option>
-                    <option value="台中市">台中市</option>
-                    <option value="台南市">台南市</option>
-                    <option value="高雄市">高雄市</option>
+                    <optgroup label="六都">
+                        <option value="台北市">台北市</option>
+                        <option value="新北市">新北市</option>
+                        <option value="桃園市">桃園市</option>
+                        <option value="台中市">台中市</option>
+                        <option value="台南市">台南市</option>
+                        <option value="高雄市">高雄市</option>
+                    </optgroup>
+                    <optgroup label="其他縣市">
+                        <option value="基隆市">基隆市</option>
+                        <option value="新竹市">新竹市</option>
+                        <option value="嘉義市">嘉義市</option>
+                        <option value="新竹縣">新竹縣</option>
+                        <option value="苗栗縣">苗栗縣</option>
+                        <option value="彰化縣">彰化縣</option>
+                        <option value="南投縣">南投縣</option>
+                        <option value="雲林縣">雲林縣</option>
+                        <option value="嘉義縣">嘉義縣</option>
+                        <option value="屏東縣">屏東縣</option>
+                        <option value="宜蘭縣">宜蘭縣</option>
+                        <option value="花蓮縣">花蓮縣</option>
+                        <option value="台東縣">台東縣</option>
+                        <option value="澎湖縣">澎湖縣</option>
+                        <option value="金門縣">金門縣</option>
+                        <option value="連江縣">連江縣</option>
+                    </optgroup>
                 </select>
             </div>
             
@@ -322,39 +342,17 @@
         const API_KEY = 'AIzaSyA8BU6HhUvgnnmJpP5CgyrUDAnmBvg1GIY';
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbyQczCc_nrwSzZx1yHCoEizMDH_p-WinZAANce_6GiK0CGVjdavb2-9VA5c2ooWg1VE/exec';
         
-        // 使用分區查詢連結
-        const ZONING_LINKS = {
-            "台北市": {
-                "name": "台北市都市計畫使用分區查詢",
-                "url": "https://www.zone.gov.taipei/",
-                "guide": "輸入地址後，查看「使用分區」欄位"
-            },
-            "新北市": {
-                "name": "新北市都市計畫整合資訊系統",
-                "url": "https://udpweb.planning.ntpc.gov.tw/",
-                "guide": "點選「使用分區查詢」→ 輸入地址"
-            },
-            "桃園市": {
-                "name": "桃園市都市計畫整合資訊系統",
-                "url": "https://gis.tycg.gov.tw/TycgOGCMap_Web/",
-                "guide": "點選「都市計畫使用分區查詢」"
-            },
-            "台中市": {
-                "name": "台中市都市計畫整合資訊系統",
-                "url": "https://www.ud.taichung.gov.tw/",
-                "guide": "點選「都市計畫書圖查詢」→ 輸入地址",
-                "note": "⚠️ 台中市麻將館限定商業區"
-            },
-            "台南市": {
-                "name": "台南市都市發展局",
-                "url": "https://www.tainan.gov.tw/",
-                "guide": "需至都發局查詢"
-            },
-            "高雄市": {
-                "name": "高雄市都市計畫整合資訊系統",
-                "url": "https://urban-web.kcg.gov.tw/KDA_gis/",
-                "guide": "點選「使用分區查詢」"
-            }
+        // 全國土地使用分區查詢（統一系統）
+        const NATIONAL_ZONING = {
+            "name": "全國土地使用分區資料查詢系統",
+            "url": "https://luz.nlma.gov.tw/web/default.aspx",
+            "guide": "輸入地址或地號查詢使用分區"
+        };
+        
+        // 各縣市特殊規定
+        const CITY_NOTES = {
+            "台中市": "⚠️ 台中市麻將館限定商業區",
+            "default": "新北/台北/桃園：住宅區或商業區皆可"
         };
         
         let map;
@@ -482,12 +480,40 @@
             };
             
             // 4. 建物年份 (10分) - 實價登錄待整合
-            const buildingScore = 5; // 預設 5 分
+            // 民國64年（1975年）以後通常有使用執照
+            const buildingYear = data.building_year || null;
+            let buildingScore = 5; // 預設 5 分
+            let buildingText = '建物年份待查詢 (5分)';
+            let buildingStatus = 'warning';
+            
+            if (buildingYear) {
+                const age = 115 - buildingYear; // 2026 - 1911 = 115
+                
+                if (buildingYear < 64) {
+                    // 民國64年以前
+                    buildingScore = 3;
+                    buildingStatus = 'fail';
+                    buildingText = `民國${buildingYear}年建（${age}年屋齡）⚠️ 需確認使用執照 (3分)`;
+                } else if (age <= 5) {
+                    buildingScore = 10;
+                    buildingStatus = 'pass';
+                    buildingText = `民國${buildingYear}年建（${age}年屋齡）✅ 新建物 (10分)`;
+                } else if (age <= 15) {
+                    buildingScore = 7;
+                    buildingStatus = 'warning';
+                    buildingText = `民國${buildingYear}年建（${age}年屋齡）⚠️ 中古屋 (7分)`;
+                } else {
+                    buildingScore = 5;
+                    buildingStatus = 'warning';
+                    buildingText = `民國${buildingYear}年建（${age}年屋齡）⚠️ 老屋 (5分)`;
+                }
+            }
+            
             score += buildingScore;
             details.building = { 
                 score: buildingScore, 
-                status: 'warning', 
-                text: '實價登錄待整合 (5分)'
+                status: buildingStatus, 
+                text: buildingText
             };
             
             // 5. 競爭狀況 (15分) - 根據實際搜尋結果
@@ -637,26 +663,27 @@
                 `;
             }
             
-            // 使用分區查詢連結
-            const zoningInfo = ZONING_LINKS[data.city];
-            if (zoningInfo) {
-                detailHTML += `
-                    <div class="detail-item" style="background: #fff8dc; border: 2px solid #ffa500;">
-                        <div style="width: 100%;">
-                            <div style="margin-bottom: 8px;">
-                                <span class="detail-label">🏛️ 使用分區查詢</span>
-                            </div>
-                            <a href="${zoningInfo.url}" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 600;">
-                                ${zoningInfo.name} →
-                            </a>
-                            <div style="color: #666; font-size: 13px; margin-top: 5px;">
-                                ${zoningInfo.guide}
-                            </div>
-                            ${zoningInfo.note ? `<div style="color: #d32f2f; font-weight: 600; margin-top: 5px;">${zoningInfo.note}</div>` : ''}
+            // 使用分區查詢連結（全國統一系統）
+            const cityNote = CITY_NOTES[data.city] || CITY_NOTES.default;
+            
+            detailHTML += `
+                <div class="detail-item" style="background: #fff8dc; border: 2px solid #ffa500;">
+                    <div style="width: 100%;">
+                        <div style="margin-bottom: 8px;">
+                            <span class="detail-label">🏛️ 使用分區查詢</span>
+                        </div>
+                        <a href="${NATIONAL_ZONING.url}" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 600;">
+                            ${NATIONAL_ZONING.name} →
+                        </a>
+                        <div style="color: #666; font-size: 13px; margin-top: 5px;">
+                            ${NATIONAL_ZONING.guide}
+                        </div>
+                        <div style="color: #d32f2f; font-weight: 600; margin-top: 5px;">
+                            ${cityNote}
                         </div>
                     </div>
-                `;
-            }
+                </div>
+            `;
             
             document.getElementById('detailInfo').innerHTML = detailHTML;
             
