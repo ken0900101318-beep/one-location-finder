@@ -1,0 +1,33 @@
+{
+  "台北市": {
+    "name": "台北市都市計畫使用分區查詢",
+    "url": "https://www.zone.gov.taipei/",
+    "guide": "輸入地址後，查看「使用分區」欄位"
+  },
+  "新北市": {
+    "name": "新北市都市計畫整合資訊系統",
+    "url": "https://udpweb.planning.ntpc.gov.tw/",
+    "guide": "點選「使用分區查詢」→ 輸入地址"
+  },
+  "桃園市": {
+    "name": "桃園市都市計畫整合資訊系統",
+    "url": "https://gis.tycg.gov.tw/TycgOGCMap_Web/",
+    "guide": "點選「都市計畫使用分區查詢」"
+  },
+  "台中市": {
+    "name": "台中市都市計畫整合資訊系統",
+    "url": "https://www.ud.taichung.gov.tw/",
+    "guide": "點選「都市計畫書圖查詢」→ 輸入地址",
+    "note": "⚠️ 台中市麻將館限定商業區"
+  },
+  "台南市": {
+    "name": "台南市都市發展局",
+    "url": "https://www.tainan.gov.tw/tainan/dep_service.asp?ID={9CB8C82E-42A3-48B3-9E2A-29913F3C7FF4}",
+    "guide": "需至都發局查詢"
+  },
+  "高雄市": {
+    "name": "高雄市都市計畫整合資訊系統",
+    "url": "https://urban-web.kcg.gov.tw/KDA_gis/",
+    "guide": "點選「使用分區查詢」"
+  }
+}
